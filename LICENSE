@@ -1,0 +1,25 @@
+kairos — CLAP container runtime for cljseq-generated plugins
+Copyright (C) 2026 Thomas Rodgers and contributors
+
+This project uses a dual-license structure:
+
+  LGPL-2.1-or-later  — public headers and library sources (include/, src/
+                        excluding src/main.cpp and any translation units that
+                        directly link Ableton Link)
+
+  GPL-2.0-or-later   — the kairos executable binary, which embeds the Ableton
+                        Link reference implementation (GPL-2.0-or-later)
+
+The LGPL-2.1-or-later license grants a linking exemption: C++ code that
+includes kairos headers or links against kairos-core as a shared library is
+not subject to the GPL requirement, provided modifications to kairos-core
+itself are shared under LGPL-2.1-or-later.
+
+The kairos runtime binary as distributed (statically linking Ableton Link) is
+subject to GPL-2.0-or-later in its entirety.
+
+Full license texts:
+  LICENSES/LGPL-2.1-or-later.txt
+  LICENSES/GPL-2.0-or-later.txt
+
+SPDX identifiers on each source file indicate which license applies.
