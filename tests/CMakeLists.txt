@@ -4,6 +4,9 @@ include(Catch)
 add_executable(kairos-tests
     test_time_identity.cpp
     test_ipc.cpp
+    test_ipc_channel.cpp
+    test_spsc_queue.cpp
+    test_session.cpp
 )
 
 target_link_libraries(kairos-tests

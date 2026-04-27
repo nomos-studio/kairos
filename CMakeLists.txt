@@ -86,6 +86,9 @@ include(${abl-link_SOURCE_DIR}/AbletonLinkConfig.cmake)
 
 add_library(kairos-core STATIC
     src/version.cpp
+    src/ipc_channel.cpp
+    src/session.cpp
+    src/control_thread.cpp
 )
 
 add_library(kairos::core ALIAS kairos-core)
