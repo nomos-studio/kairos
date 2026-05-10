@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#pragma once
+
+#include "audio_device.hpp"
+#include "event_collector.hpp"
+#include "input_event_buffer.hpp"
+#include "link_peer.hpp"
+
+#include <kairos/input_event.hpp>
+#include <kairos/plugin_graph_manager.hpp>
+#include <kairos/rcu.hpp>
+#include <kairos/time_identity.hpp>
+
+#include <cstdint>
+
+namespace kairos {
+
+// Audio-callback-driven CLAP process loop.
+//
+// Replaces process_thread when a real audio device is available.
+// The RtAudio callback drives the block cadence, so there is no timer sleep.
+// Link beat position uses captureAudioSessionState to stay locked to the
+// audio device wordclock.
+class audio_engine {
+  public:
+    struct config {
+        double       sample_rate{48000.0};
+        uint32_t     buffer_frames{256};
+        uint32_t     out_channels{2};
+        uint32_t     in_channels{0};
+        unsigned int device_id{0}; // 0 = default
+    };
+
+    audio_engine(config cfg, rcu_managed<plugin_graph_manager>& graph, link_peer& link,
+                 midi_event_queue& midi_out_queue, input_event_queue& ipc_in_queue,
+                 input_event_queue& hw_midi_in_queue, input_event_queue& osc_in_queue);
+    ~audio_engine();
+
+    audio_engine(const audio_engine&)            = delete;
+    audio_engine& operator=(const audio_engine&) = delete;
+
+    bool start();
+    void stop();
+    bool running() const noexcept;
+
+  private:
+    void on_audio_block(float** out_channels, const float* const* in_channels, uint32_t out_ch,
+                        uint32_t in_ch, uint32_t nframes, double stream_time);
+
+    config                             cfg_;
+    rcu_managed<plugin_graph_manager>& graph_;
+    link_peer&                         link_;
+    midi_event_queue&                  midi_out_queue_;
+    input_event_queue&                 ipc_in_queue_;
+    input_event_queue&                 hw_midi_in_queue_;
+    input_event_queue&                 osc_in_queue_;
+    event_collector                    collector_;
+    input_event_buffer                 in_buf_;
+    time_identity                      time_;
+    audio_device                       device_;
+};
+
+} // namespace kairos
