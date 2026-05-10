@@ -79,7 +79,7 @@ fi
 # ---------------------------------------------------------------------------
 # 4. C++ formatting (clang-format)
 # ---------------------------------------------------------------------------
-CPP_FILES=$(echo "$STAGED" | grep -E '\.(cpp|hpp|h)$' || true)
+CPP_FILES=$(echo "$STAGED" | grep -E '\.(cpp|hpp|h)$' | grep -v '^third_party/' || true)
 if [ -n "$CPP_FILES" ]; then
   if command -v clang-format &>/dev/null; then
     while IFS= read -r f; do
