@@ -28,6 +28,7 @@ set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL
 # ---------------------------------------------------------------------------
 
 option(KAIROS_BUILD_TESTS      "Build kairos unit tests"           OFF)
+option(KAIROS_BUILD_CORE       "Build the kairos CLAP plugin layer" ON)
 option(KAIROS_BUILD_EXECUTABLE "Build the kairos runtime binary"   ON)
 option(KAIROS_WASM_BRIDGE      "Build the Faust WASM bridge plugin (requires network for wasmtime)" OFF)
 
@@ -273,12 +274,26 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     )
 endif()
 
+# Interface target that exposes the executable-level private headers (link_peer,
+# midi_io, osc_server, audio_device) for thin executables that link cljseq-rt
+# directly — primarily aion, but also any future satellite binary.
+# These headers are GPL-2.0-or-later; consumers inherit that at binary link time.
+add_library(cljseq-rt-exe-headers INTERFACE)
+add_library(cljseq::rt-exe-headers ALIAS cljseq-rt-exe-headers)
+target_include_directories(cljseq-rt-exe-headers INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
 # ---------------------------------------------------------------------------
 # kairos-core — CLAP plugin layer + process/audio engine.
 #
 # Depends on cljseq-rt for the runtime substrate.  The executable is a thin
 # main() that links kairos::core (which brings cljseq::rt transitively).
+# Set KAIROS_BUILD_CORE=OFF to build cljseq-rt without the CLAP layer
+# (used by aion and other cljseq-rt consumers that do not host CLAP plugins).
 # ---------------------------------------------------------------------------
+
+if(KAIROS_BUILD_CORE)
 
 add_library(kairos-core STATIC
     src/control_thread.cpp
@@ -329,11 +344,13 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     )
 endif()
 
+endif() # KAIROS_BUILD_CORE
+
 # ---------------------------------------------------------------------------
 # Executable — thin main() + plugin discovery
 # ---------------------------------------------------------------------------
 
-if(KAIROS_BUILD_EXECUTABLE)
+if(KAIROS_BUILD_EXECUTABLE AND KAIROS_BUILD_CORE)
     add_executable(kairos
         src/main.cpp
         src/plugin_discovery.cpp
@@ -361,7 +378,7 @@ endif()
 # Tests
 # ---------------------------------------------------------------------------
 
-if(KAIROS_BUILD_TESTS)
+if(KAIROS_BUILD_TESTS AND KAIROS_BUILD_CORE)
     enable_testing()
 
     # Catch2 v3 — BSL-1.0, header-friendly, no extra dependencies.
