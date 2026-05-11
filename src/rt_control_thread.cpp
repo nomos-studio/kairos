@@ -216,7 +216,16 @@ void rt_control_thread::dispatch_message(int conn_fd, const ipc::message& msg,
         ev.note.channel      = get_i16("channel", 0);
         ev.note.key          = get_i16("key", 60);
         ev.note.velocity     = get_dbl("velocity", 0.0);
-        in_queue_.push(ev);
+
+        // Optional :beat field — if present and a scheduler is wired, defer the
+        // event until that Link beat rather than dispatching immediately.
+        const auto* beat_v = m.find_kw("beat");
+        if (beat_v && cfg_.sched_staging) {
+            const double target = get_dbl("beat", 0.0);
+            cfg_.sched_staging->push(scheduled_event{.beat = target, .event = ev});
+        } else {
+            in_queue_.push(ev);
+        }
         break;
     }
 

@@ -5,6 +5,7 @@
 #include "input_event_buffer.hpp"
 #include "link_peer.hpp"
 
+#include <kairos/event_scheduler.hpp>
 #include <kairos/input_event.hpp>
 #include <kairos/plugin_graph_manager.hpp>
 #include <kairos/rcu.hpp>
@@ -33,7 +34,8 @@ class process_thread {
 
     process_thread(config cfg, rcu_managed<plugin_graph_manager>& graph, link_peer& link,
                    midi_event_queue& midi_out_queue, input_event_queue& ipc_in_queue,
-                   input_event_queue& hw_midi_in_queue, input_event_queue& osc_in_queue);
+                   input_event_queue& hw_midi_in_queue, input_event_queue& osc_in_queue,
+                   event_scheduler* sched = nullptr);
     ~process_thread();
 
     process_thread(const process_thread&)            = delete;
@@ -57,6 +59,7 @@ class process_thread {
     input_event_buffer                 in_buf_;
     time_identity                      time_;
 
+    event_scheduler*  sched_{nullptr};
     std::atomic<bool> running_{false};
     std::thread       thread_;
 };

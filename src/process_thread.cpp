@@ -11,10 +11,10 @@ namespace kairos {
 process_thread::process_thread(config cfg, rcu_managed<plugin_graph_manager>& graph,
                                link_peer& link, midi_event_queue& midi_out_queue,
                                input_event_queue& ipc_in_queue, input_event_queue& hw_midi_in_queue,
-                               input_event_queue& osc_in_queue)
+                               input_event_queue& osc_in_queue, event_scheduler* sched)
     : cfg_(cfg), graph_(graph), link_(link), midi_out_queue_(midi_out_queue),
-      ipc_in_queue_(ipc_in_queue), hw_midi_in_queue_(hw_midi_in_queue),
-      osc_in_queue_(osc_in_queue) {
+      ipc_in_queue_(ipc_in_queue), hw_midi_in_queue_(hw_midi_in_queue), osc_in_queue_(osc_in_queue),
+      sched_(sched) {
 }
 
 process_thread::~process_thread() {
@@ -56,6 +56,11 @@ void process_thread::run() {
 
         const double beat = link_.beat_at_time(t0);
         time_.apply_if_ready(beat);
+
+        // Tick the event scheduler before draining ipc_in_queue so that
+        // beat-tagged events land in ipc_in_queue at the right block.
+        if (sched_)
+            sched_->tick(beat, [&](const clap_event_union& ev) { ipc_in_queue_.push(ev); });
 
         in_buf_.clear();
         in_buf_.drain(ipc_in_queue_);

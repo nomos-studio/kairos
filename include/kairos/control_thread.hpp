@@ -23,13 +23,14 @@ namespace kairos {
 class control_thread : public rt_control_thread {
   public:
     struct config {
-        std::string        socket_path; // Unix domain socket path
-        std::string        db_path;     // txlog database path
-        plugin_registry    plugins;     // plugin_id → .clap file path
-        const clap_host_t* host{nullptr};
-        double             sample_rate{48000.0};
-        uint32_t           min_frames{64};
-        uint32_t           max_frames{256};
+        std::string          socket_path;            // Unix domain socket path
+        std::string          db_path;                // txlog database path
+        sched_staging_queue* sched_staging{nullptr}; // null = immediate dispatch
+        plugin_registry      plugins;                // plugin_id → .clap file path
+        const clap_host_t*   host{nullptr};
+        double               sample_rate{48000.0};
+        uint32_t             min_frames{64};
+        uint32_t             max_frames{256};
     };
 
     explicit control_thread(config cfg, param_queue& queue, input_event_queue& in_queue);

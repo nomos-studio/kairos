@@ -4,6 +4,7 @@
 #include <kairos/input_event.hpp>
 #include <kairos/ipc_channel.hpp>
 #include <kairos/param_event.hpp>
+#include <kairos/scheduled_event.hpp>
 #include <kairos/session.hpp>
 #include <kairos/spsc_queue.hpp>
 
@@ -36,8 +37,9 @@ using param_queue = spsc_queue<param_event, param_queue_capacity>;
 class rt_control_thread {
   public:
     struct config {
-        std::string socket_path; // Unix domain socket path
-        std::string db_path;     // txlog database path
+        std::string          socket_path;            // Unix domain socket path
+        std::string          db_path;                // txlog database path
+        sched_staging_queue* sched_staging{nullptr}; // null = immediate dispatch
     };
 
     explicit rt_control_thread(config cfg, param_queue& queue, input_event_queue& in_queue);

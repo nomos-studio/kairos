@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <kairos/control_thread.hpp>
+#include <kairos/event_scheduler.hpp>
 #include <kairos/input_event.hpp>
 #include <kairos/plugin_host.hpp>
 #include <kairos/spsc_queue.hpp>
@@ -156,15 +157,19 @@ int main(int argc, char* argv[]) {
     kairos::input_event_queue hw_midi_in_queue;
     kairos::input_event_queue osc_in_queue;
 
+    // Beat scheduler — shared between control thread (push) and process loop (tick).
+    kairos::event_scheduler scheduler;
+
     // Control thread — IPC + session + graph management
     kairos::control_thread::config ctrl_cfg{
-        .socket_path = socket_path,
-        .db_path     = db_path,
-        .plugins     = std::move(plugins),
-        .host        = kairos::kairos_host(),
-        .sample_rate = sample_rate,
-        .min_frames  = block_size,
-        .max_frames  = block_size,
+        .socket_path   = socket_path,
+        .db_path       = db_path,
+        .sched_staging = &scheduler.staging(),
+        .plugins       = std::move(plugins),
+        .host          = kairos::kairos_host(),
+        .sample_rate   = sample_rate,
+        .min_frames    = block_size,
+        .max_frames    = block_size,
     };
     kairos::control_thread ctrl{ctrl_cfg, param_queue, ipc_in_queue};
     ctrl.start();
@@ -199,9 +204,9 @@ int main(int argc, char* argv[]) {
             .in_channels   = audio_in_ch,
             .device_id     = audio_device_id,
         };
-        audio_eng =
-            std::make_unique<kairos::audio_engine>(eng_cfg, ctrl.graph(), link, midi_out_queue,
-                                                   ipc_in_queue, hw_midi_in_queue, osc_in_queue);
+        audio_eng = std::make_unique<kairos::audio_engine>(
+            eng_cfg, ctrl.graph(), link, midi_out_queue, ipc_in_queue, hw_midi_in_queue,
+            osc_in_queue, &scheduler);
         if (!audio_eng->start()) {
             std::cerr << "[kairos] audio engine failed to start, falling back to headless\n";
             audio_eng.reset();
@@ -213,9 +218,9 @@ int main(int argc, char* argv[]) {
             .sample_rate = sample_rate,
             .block_size  = block_size,
         };
-        proc_thread =
-            std::make_unique<kairos::process_thread>(proc_cfg, ctrl.graph(), link, midi_out_queue,
-                                                     ipc_in_queue, hw_midi_in_queue, osc_in_queue);
+        proc_thread = std::make_unique<kairos::process_thread>(
+            proc_cfg, ctrl.graph(), link, midi_out_queue, ipc_in_queue, hw_midi_in_queue,
+            osc_in_queue, &scheduler);
         proc_thread->start();
     }
 
