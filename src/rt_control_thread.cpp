@@ -64,6 +64,23 @@ namespace {
         return fd;
     }
 
+    // Build a CLAP note event from its component fields.
+    clap_event_union make_note_event(bool is_on, int16_t key, int16_t channel, int16_t port,
+                                     int16_t note_id, double velocity) noexcept {
+        clap_event_union ev{};
+        ev.note.header.size     = sizeof(clap_event_note_t);
+        ev.note.header.time     = 0;
+        ev.note.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        ev.note.header.type     = is_on ? CLAP_EVENT_NOTE_ON : CLAP_EVENT_NOTE_OFF;
+        ev.note.header.flags    = 0;
+        ev.note.note_id         = note_id;
+        ev.note.port_index      = port;
+        ev.note.channel         = channel;
+        ev.note.key             = key;
+        ev.note.velocity        = velocity;
+        return ev;
+    }
+
 } // namespace
 
 rt_control_thread::rt_control_thread(config cfg, param_queue& queue, input_event_queue& in_queue)
@@ -204,18 +221,10 @@ void rt_control_thread::dispatch_message(int conn_fd, const ipc::message& msg,
             return def;
         };
 
-        clap_event_union ev{};
-        ev.note.header.size     = sizeof(clap_event_note_t);
-        ev.note.header.time     = 0;
-        ev.note.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-        ev.note.header.type =
-            (msg.type() == ipc::msg_note_on) ? CLAP_EVENT_NOTE_ON : CLAP_EVENT_NOTE_OFF;
-        ev.note.header.flags = 0;
-        ev.note.note_id      = get_i16("note-id", -1);
-        ev.note.port_index   = get_i16("port", 0);
-        ev.note.channel      = get_i16("channel", 0);
-        ev.note.key          = get_i16("key", 60);
-        ev.note.velocity     = get_dbl("velocity", 0.0);
+        const bool is_on = (msg.type() == ipc::msg_note_on);
+        auto       ev =
+            make_note_event(is_on, get_i16("key", 60), get_i16("channel", 0), get_i16("port", 0),
+                            get_i16("note-id", -1), get_dbl("velocity", 0.0));
 
         // Optional :beat field — if present and a scheduler is wired, defer the
         // event until that Link beat rather than dispatching immediately.
@@ -225,6 +234,66 @@ void rt_control_thread::dispatch_message(int conn_fd, const ipc::message& msg,
             cfg_.sched_staging->push(scheduled_event{.beat = target, .event = ev});
         } else {
             in_queue_.push(ev);
+        }
+        break;
+    }
+
+    case ipc::msg_schedule_bundle: {
+        // Bundle of beat-accurate events: {:at-beat D :events [{:at-tick N :type :kw ...}]}
+        // Each event's beat = at-beat + at-tick / 24.0.
+        // Requires sched_staging to be wired; silently drops the bundle otherwise.
+        if (msg.payload.empty() || !cfg_.sched_staging)
+            break;
+        const std::string_view text{reinterpret_cast<const char*>(msg.payload.data()),
+                                    msg.payload.size()};
+        auto                   parsed = edn::parse(text);
+        if (!parsed || !parsed->is<edn::map>())
+            break;
+        const auto& m        = parsed->get<edn::map>();
+        const auto* beat_v   = m.find_kw("at-beat");
+        const auto* events_v = m.find_kw("events");
+        if (!beat_v || !events_v || !events_v->is<edn::vector>())
+            break;
+
+        double anchor = 0.0;
+        if (beat_v->is<double>())
+            anchor = beat_v->get<double>();
+        else if (beat_v->is<int64_t>())
+            anchor = static_cast<double>(beat_v->get<int64_t>());
+
+        for (const auto& item : events_v->get<edn::vector>().items) {
+            if (!item.is<edn::map>())
+                continue;
+            const auto& em = item.get<edn::map>();
+
+            auto get_i = [&](const char* kw, int64_t def) -> int64_t {
+                const auto* v = em.find_kw(kw);
+                if (v && v->is<int64_t>())
+                    return v->get<int64_t>();
+                return def;
+            };
+            auto get_d = [&](const char* kw, double def) -> double {
+                const auto* v = em.find_kw(kw);
+                if (v && v->is<double>())
+                    return v->get<double>();
+                if (v && v->is<int64_t>())
+                    return static_cast<double>(v->get<int64_t>());
+                return def;
+            };
+
+            const int64_t at_tick = get_i("at-tick", 0);
+            const double  beat    = anchor + at_tick / 24.0;
+
+            const auto* type_v = em.find_kw("type");
+            const bool  is_on  = !(type_v && type_v->is<edn::keyword>() &&
+                                   type_v->get<edn::keyword>().name == "note-off");
+
+            auto ev = make_note_event(
+                is_on, static_cast<int16_t>(get_i("key", 60)),
+                static_cast<int16_t>(get_i("channel", 0)), static_cast<int16_t>(get_i("port", 0)),
+                static_cast<int16_t>(get_i("note-id", -1)), get_d("velocity", 0.0));
+
+            cfg_.sched_staging->push(scheduled_event{.beat = beat, .event = ev});
         }
         break;
     }
