@@ -35,7 +35,7 @@
 
 #include "wasm_bridge_plugin.hpp"
 
-#include <kairos/rcu.hpp>
+#include <nomos/rt/rcu.hpp>
 
 #include <clap/audio-buffer.h>
 #include <clap/events.h>

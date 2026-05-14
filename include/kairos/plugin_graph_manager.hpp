@@ -28,7 +28,7 @@ class plugin_graph_manager {
 
     // Instantiate all plugins in the graph.  Resets any previous graph first.
     // Fails on the first plugin that cannot be loaded.
-    result<std::monostate, plugin_error>
+    nomos::rt::result<std::monostate, plugin_error>
     load(const plugin_graph& graph, const plugin_registry& registry, const clap_host_t* host);
 
     // Store the audio parameters used to activate nodes and wire audio buffers.
@@ -36,11 +36,11 @@ class plugin_graph_manager {
     void set_audio_config(double sample_rate, uint32_t min_frames, uint32_t max_frames) noexcept;
 
     // Activate all loaded instances.
-    result<std::monostate, plugin_error> activate(double sample_rate, uint32_t min_frames,
-                                                  uint32_t max_frames);
+    nomos::rt::result<std::monostate, plugin_error>
+    activate(double sample_rate, uint32_t min_frames, uint32_t max_frames);
 
     // Activate any initialised nodes then transition them to processing state.
-    result<std::monostate, plugin_error> start_processing_all();
+    nomos::rt::result<std::monostate, plugin_error> start_processing_all();
 
     // Drive one block through all processing nodes in topological order.
     // proc supplies: frames_count, steady_time, transport, in_events, out_events.
@@ -69,8 +69,8 @@ class plugin_graph_manager {
     // Gapless hot-swap of the WASM module for a single node.
     // Delegates to plugin_instance::hot_swap() which uses the kairos RCU extension.
     // Returns node_not_found if no node has the given id.
-    result<std::monostate, plugin_error> hot_swap_node(const edn::keyword& id,
-                                                       const std::string&  new_wasm_path);
+    nomos::rt::result<std::monostate, plugin_error> hot_swap_node(const edn::keyword& id,
+                                                                  const std::string& new_wasm_path);
 
   private:
     struct node_entry {

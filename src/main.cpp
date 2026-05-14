@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <kairos/control_thread.hpp>
-#include <kairos/event_scheduler.hpp>
-#include <kairos/input_event.hpp>
 #include <kairos/plugin_host.hpp>
-#include <kairos/spsc_queue.hpp>
+#include <nomos/rt/event_scheduler.hpp>
+#include <nomos/rt/input_event.hpp>
+#include <nomos/rt/spsc_queue.hpp>
 
 #include "audio_device.hpp"
 #include "audio_engine.hpp"
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (list_audio_devs) {
-        kairos::audio_device::list_devices();
+        nomos::rt::audio_device::list_devices();
         return EXIT_SUCCESS;
     }
 
@@ -151,14 +151,14 @@ int main(int argc, char* argv[]) {
         std::cerr << "  " << id << " → " << path << "\n";
 
     // Shared queues
-    kairos::param_queue       param_queue;
-    kairos::midi_event_queue  midi_out_queue;
-    kairos::input_event_queue ipc_in_queue;
-    kairos::input_event_queue hw_midi_in_queue;
-    kairos::input_event_queue osc_in_queue;
+    nomos::rt::param_queue       param_queue;
+    nomos::rt::midi_event_queue  midi_out_queue;
+    nomos::rt::input_event_queue ipc_in_queue;
+    nomos::rt::input_event_queue hw_midi_in_queue;
+    nomos::rt::input_event_queue osc_in_queue;
 
     // Beat scheduler — shared between control thread (push) and process loop (tick).
-    kairos::event_scheduler scheduler;
+    nomos::rt::event_scheduler scheduler;
 
     // Control thread — IPC + session + graph management
     kairos::control_thread::config ctrl_cfg{
@@ -175,19 +175,19 @@ int main(int argc, char* argv[]) {
     ctrl.start();
 
     // Link peer
-    kairos::link_peer link{initial_bpm};
+    nomos::rt::link_peer link{initial_bpm};
     link.enable(true);
 
     // MIDI I/O
-    kairos::midi_io midi;
-    kairos::midi_io::list_ports();
+    nomos::rt::midi_io midi;
+    nomos::rt::midi_io::list_ports();
     if (midi_port >= 0)
         midi.open_port(static_cast<unsigned int>(midi_port));
     if (midi_in_port >= 0)
         midi.open_input_port(static_cast<unsigned int>(midi_in_port), hw_midi_in_queue);
 
     // OSC server
-    kairos::osc_server osc{osc_port, osc_in_queue};
+    nomos::rt::osc_server osc{osc_port, osc_in_queue};
     osc.start();
 
     // Process loop: audio_engine (wordclock-locked) or process_thread (headless).

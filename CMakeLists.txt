@@ -3,18 +3,17 @@ cmake_minimum_required(VERSION 3.20)
 
 project(kairos
     VERSION 0.1.0
-    DESCRIPTION "kairos — CLAP container runtime for cljseq-generated plugins"
-    HOMEPAGE_URL "https://github.com/cljseq/kairos"
+    DESCRIPTION "kairos — CLAP container runtime for nomos-studio plugins"
+    HOMEPAGE_URL "https://github.com/nomos-studio/kairos"
     LANGUAGES C CXX)
 
 # ---------------------------------------------------------------------------
-# Dependency policy (mirrors cljseq native convention)
+# Dependency policy
 #
 # - No Boost. C++20 STL covers all use cases.
 # - FetchContent + pinned tag for any dependency with a build step.
 # - FETCHCONTENT_UPDATES_DISCONNECTED: skip network on subsequent invocations.
 # - Tests use Catch2 v3 (Boost Software License, header-friendly).
-# - SQLite3 via find_package — available on all target platforms.
 # ---------------------------------------------------------------------------
 
 include(FetchContent)
@@ -27,130 +26,36 @@ set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL
 # Build options
 # ---------------------------------------------------------------------------
 
-option(KAIROS_BUILD_TESTS      "Build kairos unit tests"           OFF)
-option(KAIROS_BUILD_CORE       "Build the kairos CLAP plugin layer" ON)
-option(KAIROS_BUILD_EXECUTABLE "Build the kairos runtime binary"   ON)
+option(KAIROS_BUILD_TESTS      "Build kairos unit tests"            OFF)
+option(KAIROS_BUILD_CORE       "Build the kairos CLAP plugin layer"  ON)
+option(KAIROS_BUILD_EXECUTABLE "Build the kairos runtime binary"    ON)
 option(KAIROS_WASM_BRIDGE      "Build the Faust WASM bridge plugin (requires network for wasmtime)" OFF)
 
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
 
-# SQLite3 — system package on all target platforms.
-find_package(SQLite3 REQUIRED)
-
-# txlog-cpp — pulls in edn-cpp transitively.
-#   To use a local checkout: cmake -DTXLOG_CPP_DIR=/path/to/txlog-cpp ...
-if(DEFINED TXLOG_CPP_DIR)
-    FetchContent_Declare(txlog-cpp SOURCE_DIR "${TXLOG_CPP_DIR}")
-else()
-    FetchContent_Declare(txlog-cpp
-        GIT_REPOSITORY https://github.com/cljseq/txlog-cpp.git
-        GIT_TAG        v0.1.0
-        GIT_SHALLOW    TRUE)
-endif()
-set(TXLOG_CPP_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
-set(TXLOG_CPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(txlog-cpp)
-
 # CLAP SDK — header-only C/C++ interface.
+# Declared here so FetchContent_MakeAvailable(nomos-rt) below does not
+# re-fetch it; both projects pin the same tag so the first declaration wins.
 FetchContent_Declare(clap
     GIT_REPOSITORY https://github.com/free-audio/clap.git
     GIT_TAG        1.2.6
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(clap)
 
-# ---------------------------------------------------------------------------
-# liburcu — vendored from third_party/liburcu/ (LGPL-2.1-or-later).
-#
-# Flavor selection:
-#   macOS  → urcu-bp (bulletproof; no thread registration, no sys_membarrier)
-#   Linux  → urcu-mb (memory barrier; sys_membarrier upgrade path deferred)
-#
-# config.h is copied from the appropriate platform file at configure time.
-# ---------------------------------------------------------------------------
-
-set(URCU_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/liburcu")
-set(URCU_GENERATED_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/urcu-include")
-
-# Select and materialise config.h for the target platform.
-# Start with urcu-bp on all platforms: no thread registration, no
-# sys_membarrier dependency, works in the audio callback without ceremony.
-# Linux upgrade path: switch URCU_FLAVOR_SRC to urcu.c (urcu-mb) once
-# we are ready to adopt the thread-registration discipline.
-if(APPLE)
-    set(URCU_CONFIG_SRC "${URCU_ROOT}/config/config-darwin.h")
+# nomos-rt — shared C++ runtime substrate (Link, MIDI/OSC, IPC, txlog, modulators).
+#   To use a local checkout: cmake -DNOMOS_RT_DIR=/path/to/nomos-rt ...
+if(DEFINED NOMOS_RT_DIR)
+    FetchContent_Declare(nomos-rt SOURCE_DIR "${NOMOS_RT_DIR}")
 else()
-    set(URCU_CONFIG_SRC "${URCU_ROOT}/config/config-linux.h")
-endif()
-set(URCU_FLAVOR_SRC "${URCU_ROOT}/src/urcu-bp.c")
-
-configure_file("${URCU_CONFIG_SRC}"
-               "${URCU_GENERATED_INCLUDE}/urcu/config.h" COPYONLY)
-
-add_library(urcu-flavor STATIC
-    "${URCU_FLAVOR_SRC}"
-    "${URCU_ROOT}/src/compat_futex.c"
-    "${URCU_ROOT}/src/urcu-call-rcu-impl.h"
-)
-
-add_library(urcu::flavor ALIAS urcu-flavor)
-
-target_include_directories(urcu-flavor
-    PUBLIC
-        "${URCU_ROOT}/include"
-        "${URCU_GENERATED_INCLUDE}"
-    PRIVATE
-        "${URCU_ROOT}/src"
-)
-
-# Macro defines intentionally omitted: urcu-bp.c and urcu.c define
-# _LGPL_SOURCE and URCU_NO_COMPAT_IDENTIFIERS themselves at the top of the file.
-
-set_target_properties(urcu-flavor PROPERTIES
-    C_STANDARD   11
-    C_STANDARD_REQUIRED ON
-)
-
-# RtMidi — cross-platform MIDI I/O (MIT).
-# Pin: 6.0.0 — matches cljseq-sidecar.
-FetchContent_Declare(rtmidi
-    GIT_REPOSITORY https://github.com/thestk/rtmidi.git
-    GIT_TAG        6.0.0
-    GIT_SHALLOW    TRUE)
-set(RTMIDI_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(rtmidi)
-
-# RtAudio — cross-platform audio I/O (MIT).
-# Pin: 6.0.1 — same family as RtMidi, matches cljseq native convention.
-FetchContent_Declare(rtaudio
-    GIT_REPOSITORY https://github.com/thestk/rtaudio.git
-    GIT_TAG        6.0.1
-    GIT_SHALLOW    TRUE)
-set(RTAUDIO_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(RTAUDIO_TARGETNAME_UNINSTALL rtaudio_uninstall CACHE STRING "" FORCE)
-FetchContent_MakeAvailable(rtaudio)
-
-# Ableton Link — beat-sync peer protocol.
-# Use FetchContent_Populate + include() rather than FetchContent_MakeAvailable:
-# AbletonLinkConfig.cmake creates an IMPORTED INTERFACE target; if added via
-# add_subdirectory (what MakeAvailable does) that target has subdirectory scope
-# and is invisible to this CMakeLists. Including the config directly puts the
-# target in the top-level scope where target_link_libraries can find it.
-#   To use a local checkout: cmake -DLINK_DIR=/path/to/link ...
-if(DEFINED LINK_DIR)
-    FetchContent_Declare(abl-link SOURCE_DIR "${LINK_DIR}")
-else()
-    FetchContent_Declare(abl-link
-        GIT_REPOSITORY https://github.com/Ableton/link.git
-        GIT_TAG        Link-3.1.1
+    FetchContent_Declare(nomos-rt
+        GIT_REPOSITORY https://github.com/nomos-studio/nomos-rt.git
+        GIT_TAG        main
         GIT_SHALLOW    TRUE)
 endif()
-FetchContent_GetProperties(abl-link)
-if(NOT abl-link_POPULATED)
-    FetchContent_Populate(abl-link)
-endif()
-include(${abl-link_SOURCE_DIR}/AbletonLinkConfig.cmake)
+set(NOMOS_RT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nomos-rt)
 
 # ---------------------------------------------------------------------------
 # wasmtime C API — pre-built binaries, downloaded only when KAIROS_WASM_BRIDGE=ON.
@@ -191,7 +96,6 @@ if(KAIROS_WASM_BRIDGE)
         URL_HASH "${_wasmtime_hash}")
     FetchContent_MakeAvailable(wasmtime)
 
-    # kairos-wasmtime INTERFACE target: exposes headers and links the static lib + system deps.
     add_library(kairos-wasmtime INTERFACE)
     target_include_directories(kairos-wasmtime INTERFACE "${wasmtime_SOURCE_DIR}/include")
     target_link_libraries(kairos-wasmtime INTERFACE
@@ -203,8 +107,6 @@ if(KAIROS_WASM_BRIDGE)
         target_link_libraries(kairos-wasmtime INTERFACE pthread dl)
     endif()
 
-    # nlohmann/json — header-only JSON for Faust metadata parsing.
-    # Pin: v3.11.3.
     FetchContent_Declare(nlohmann_json
         GIT_REPOSITORY https://github.com/nlohmann/json.git
         GIT_TAG        v3.11.3
@@ -215,87 +117,17 @@ if(KAIROS_WASM_BRIDGE)
 endif()
 
 # ---------------------------------------------------------------------------
-# cljseq-rt — shared runtime substrate; no CLAP plugin machinery.
-#
-# Contains: IPC channel, session (txlog), rt_control_thread base, Link peer,
-# MIDI I/O, OSC server, audio device, event infrastructure.
-#
-# Ableton::Link is GPL-2.0-or-later; cljseq-rt inherits that license at link
-# time.  kairos-core (CLAP layer) and the kairos executable link cljseq-rt and
-# are therefore also GPL at the binary level, consistent with the existing
-# control_thread.cpp / main.cpp SPDX headers.
-#
-# aion (future) links cljseq-rt without kairos-core, keeping the CLAP machinery
-# out of the embedded/RPi deployment.
-# ---------------------------------------------------------------------------
-
-add_library(cljseq-rt STATIC
-    src/version.cpp
-    src/ipc_channel.cpp
-    src/session.cpp
-    src/rt_control_thread.cpp
-    src/link_peer.cpp
-    src/midi_io.cpp
-    src/event_collector.cpp
-    src/input_event_buffer.cpp
-    src/osc_server.cpp
-    src/audio_device.cpp
-)
-
-add_library(cljseq::rt ALIAS cljseq-rt)
-
-target_include_directories(cljseq-rt
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    PRIVATE
-        src
-)
-
-target_link_libraries(cljseq-rt
-    PUBLIC
-        txlog::txlog
-        clap
-        urcu::flavor
-        Ableton::Link
-        rtmidi
-        rtaudio
-)
-
-set_target_properties(cljseq-rt PROPERTIES
-    CXX_STANDARD          20
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS        OFF
-)
-
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    target_compile_options(cljseq-rt PRIVATE
-        $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Werror>
-        $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
-    )
-endif()
-
-# Interface target that exposes the executable-level private headers (link_peer,
-# midi_io, osc_server, audio_device) for thin executables that link cljseq-rt
-# directly — primarily aion, but also any future satellite binary.
-# These headers are GPL-2.0-or-later; consumers inherit that at binary link time.
-add_library(cljseq-rt-exe-headers INTERFACE)
-add_library(cljseq::rt-exe-headers ALIAS cljseq-rt-exe-headers)
-target_include_directories(cljseq-rt-exe-headers INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-)
-
-# ---------------------------------------------------------------------------
 # kairos-core — CLAP plugin layer + process/audio engine.
 #
-# Depends on cljseq-rt for the runtime substrate.  The executable is a thin
-# main() that links kairos::core (which brings cljseq::rt transitively).
-# Set KAIROS_BUILD_CORE=OFF to build cljseq-rt without the CLAP layer
-# (used by aion and other cljseq-rt consumers that do not host CLAP plugins).
+# Depends on nomos::rt for the runtime substrate.  The executable is a thin
+# main() that links kairos::core (which brings nomos::rt transitively).
+# Set KAIROS_BUILD_CORE=OFF to build without the CLAP layer.
 # ---------------------------------------------------------------------------
 
 if(KAIROS_BUILD_CORE)
 
 add_library(kairos-core STATIC
+    src/version.cpp
     src/control_thread.cpp
     src/plugin_host.cpp
     src/plugin_instance.cpp
@@ -316,8 +148,9 @@ target_include_directories(kairos-core
 
 target_link_libraries(kairos-core
     PUBLIC
-        cljseq::rt
+        nomos::rt
     PRIVATE
+        nomos::rt-exe-headers
         ${CMAKE_DL_LIBS}
 )
 
@@ -332,10 +165,6 @@ if(KAIROS_WASM_BRIDGE)
     target_compile_definitions(kairos-core PRIVATE KAIROS_WASM_BRIDGE=1)
     target_link_libraries(kairos-core PRIVATE kairos-wasmtime nlohmann_json::nlohmann_json)
 endif()
-
-# ---------------------------------------------------------------------------
-# Compiler warnings (opt-in; does not affect consumers)
-# ---------------------------------------------------------------------------
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_compile_options(kairos-core PRIVATE
@@ -358,7 +187,10 @@ if(KAIROS_BUILD_EXECUTABLE AND KAIROS_BUILD_CORE)
 
     target_include_directories(kairos PRIVATE src)
 
-    target_link_libraries(kairos PRIVATE kairos::core)
+    target_link_libraries(kairos PRIVATE
+        kairos::core
+        nomos::rt-exe-headers
+    )
 
     set_target_properties(kairos PROPERTIES
         CXX_STANDARD          20
@@ -381,8 +213,6 @@ endif()
 if(KAIROS_BUILD_TESTS AND KAIROS_BUILD_CORE)
     enable_testing()
 
-    # Catch2 v3 — BSL-1.0, header-friendly, no extra dependencies.
-    # Pin: v3.7.1 — update deliberately and document the reason.
     FetchContent_Declare(Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
         GIT_TAG        v3.7.1

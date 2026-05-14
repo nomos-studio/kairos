@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 #pragma once
 
-#include <kairos/result.hpp>
+#include <nomos/rt/result.hpp>
 
 #include <clap/entry.h>
 #include <clap/ext/audio-ports.h>
@@ -45,7 +45,7 @@ class plugin_instance {
     // Load a CLAP plugin binary at `path`, find the plugin with `plugin_id`,
     // and call plugin->init().  On macOS the path must point directly to the
     // Mach-O binary (bundle unwrapping is handled by the caller for now).
-    static result<plugin_instance, plugin_error>
+    static nomos::rt::result<plugin_instance, plugin_error>
     load(const std::string& path, const std::string& plugin_id, const clap_host_t* host);
 
     ~plugin_instance();
@@ -54,10 +54,10 @@ class plugin_instance {
     plugin_instance(const plugin_instance&)            = delete;
     plugin_instance& operator=(const plugin_instance&) = delete;
 
-    result<std::monostate, plugin_error> activate(double sample_rate, uint32_t min_frames,
-                                                  uint32_t max_frames);
+    nomos::rt::result<std::monostate, plugin_error>
+    activate(double sample_rate, uint32_t min_frames, uint32_t max_frames);
 
-    result<std::monostate, plugin_error> start_processing();
+    nomos::rt::result<std::monostate, plugin_error> start_processing();
 
     clap_process_status process(const clap_process_t& proc);
 
@@ -70,7 +70,7 @@ class plugin_instance {
     // Returns hot_swap_unsupported if the plugin lacks the kairos hot-swap extension.
     // Returns hot_swap_failed if the new path is unreadable or has a different topology.
     // Only valid in activated or processing state.
-    result<std::monostate, plugin_error> hot_swap(const std::string& new_wasm_path);
+    nomos::rt::result<std::monostate, plugin_error> hot_swap(const std::string& new_wasm_path);
 
     const clap_plugin_descriptor_t* descriptor() const noexcept;
     state                           current_state() const noexcept;

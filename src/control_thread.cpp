@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <kairos/control_thread.hpp>
-#include <kairos/ipc.hpp>
+#include <nomos/rt/ipc.hpp>
 
 #include <edn/parser.hpp>
 
 namespace kairos {
 
-control_thread::control_thread(config cfg, param_queue& queue, input_event_queue& in_queue)
-    : rt_control_thread(
-          rt_control_thread::config{
+control_thread::control_thread(config cfg, nomos::rt::param_queue& queue,
+                               nomos::rt::input_event_queue& in_queue)
+    : nomos::rt::rt_control_thread(
+          nomos::rt::rt_control_thread::config{
               .socket_path   = std::move(cfg.socket_path),
               .db_path       = std::move(cfg.db_path),
               .sched_staging = cfg.sched_staging,
@@ -17,8 +18,8 @@ control_thread::control_thread(config cfg, param_queue& queue, input_event_queue
       kairos_cfg_(std::move(cfg)) {
 }
 
-void control_thread::dispatch_extension(int conn_fd, const ipc::message& msg,
-                                        std::optional<session>& sess) {
+void control_thread::dispatch_extension(int conn_fd, const nomos::rt::ipc::message& msg,
+                                        std::optional<nomos::rt::session>& sess) {
     switch (msg.type()) {
     case ipc::msg_graph_load: {
         if (msg.payload.empty())

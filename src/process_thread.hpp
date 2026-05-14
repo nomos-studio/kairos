@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
-#include "event_collector.hpp"
-#include "input_event_buffer.hpp"
-#include "link_peer.hpp"
+#include "nomos::rt::event_collector.hpp"
+#include "nomos::rt::input_event_buffer.hpp"
+#include "nomos::rt::link_peer.hpp"
 
-#include <kairos/event_scheduler.hpp>
-#include <kairos/input_event.hpp>
 #include <kairos/plugin_graph_manager.hpp>
-#include <kairos/rcu.hpp>
-#include <kairos/time_identity.hpp>
+#include <nomos/rt/input_event.hpp>
+#include <nomos/rt/nomos::rt::event_scheduler.hpp>
+#include <nomos/rt/nomos::rt::time_identity.hpp>
+#include <nomos/rt/rcu.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -20,9 +20,9 @@ namespace kairos {
 // Timer-driven CLAP process loop.
 //
 // Runs at block rate (block_size / sample_rate), drains three input queues
-// (IPC, hardware MIDI, OSC) into an input_event_buffer, calls process_all()
+// (IPC, hardware MIDI, OSC) into an nomos::rt::input_event_buffer, calls process_all()
 // on all graph nodes, translates CLAP output events to midi_out_events, and
-// pushes batches into the midi_event_queue for the MIDI dispatch thread.
+// pushes batches into the nomos::rt::midi_event_queue for the MIDI dispatch thread.
 //
 // No audio I/O — plugins run in headless mode (null audio buffers).
 class process_thread {
@@ -32,10 +32,12 @@ class process_thread {
         uint32_t block_size{64};
     };
 
-    process_thread(config cfg, rcu_managed<plugin_graph_manager>& graph, link_peer& link,
-                   midi_event_queue& midi_out_queue, input_event_queue& ipc_in_queue,
-                   input_event_queue& hw_midi_in_queue, input_event_queue& osc_in_queue,
-                   event_scheduler* sched = nullptr);
+    process_thread(config cfg, nomos::rt::rcu_managed<plugin_graph_manager>& graph,
+                   nomos::rt::link_peer& link, nomos::rt::midi_event_queue& midi_out_queue,
+                   nomos::rt::input_event_queue& ipc_in_queue,
+                   nomos::rt::input_event_queue& hw_midi_in_queue,
+                   nomos::rt::input_event_queue& osc_in_queue,
+                   nomos::rt::event_scheduler*   sched = nullptr);
     ~process_thread();
 
     process_thread(const process_thread&)            = delete;
@@ -48,20 +50,20 @@ class process_thread {
   private:
     void run();
 
-    config                             cfg_;
-    rcu_managed<plugin_graph_manager>& graph_;
-    link_peer&                         link_;
-    midi_event_queue&                  midi_out_queue_;
-    input_event_queue&                 ipc_in_queue_;
-    input_event_queue&                 hw_midi_in_queue_;
-    input_event_queue&                 osc_in_queue_;
-    event_collector                    collector_;
-    input_event_buffer                 in_buf_;
-    time_identity                      time_;
+    config                                        cfg_;
+    nomos::rt::rcu_managed<plugin_graph_manager>& graph_;
+    nomos::rt::link_peer&                         link_;
+    nomos::rt::midi_event_queue&                  midi_out_queue_;
+    nomos::rt::input_event_queue&                 ipc_in_queue_;
+    nomos::rt::input_event_queue&                 hw_midi_in_queue_;
+    nomos::rt::input_event_queue&                 osc_in_queue_;
+    nomos::rt::event_collector                    collector_;
+    nomos::rt::input_event_buffer                 in_buf_;
+    nomos::rt::time_identity                      time_;
 
-    event_scheduler*  sched_{nullptr};
-    std::atomic<bool> running_{false};
-    std::thread       thread_;
+    nomos::rt::event_scheduler* sched_{nullptr};
+    std::atomic<bool>           running_{false};
+    std::thread                 thread_;
 };
 
 } // namespace kairos
