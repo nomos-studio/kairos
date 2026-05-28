@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
-#include "nomos::rt::audio_device.hpp"
-#include "nomos::rt::event_collector.hpp"
-#include "nomos::rt::input_event_buffer.hpp"
-#include "nomos::rt::link_peer.hpp"
+#include "audio_device.hpp"
+#include "event_collector.hpp"
+#include "input_event_buffer.hpp"
+#include "link_peer.hpp"
 
 #include <kairos/plugin_graph_manager.hpp>
+#include <nomos/rt/event_scheduler.hpp>
 #include <nomos/rt/input_event.hpp>
-#include <nomos/rt/nomos::rt::event_scheduler.hpp>
-#include <nomos/rt/nomos::rt::time_identity.hpp>
 #include <nomos/rt/rcu.hpp>
+#include <nomos/rt/time_identity.hpp>
 
 #include <cstdint>
 

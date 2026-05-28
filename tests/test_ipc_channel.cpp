@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 #include <catch2/catch_test_macros.hpp>
 
-#include <kairos/ipc_channel.hpp>
+#include <nomos/rt/ipc_channel.hpp>
 
 #include <cstring>
 #include <sys/socket.h>
@@ -17,12 +17,12 @@ static std::pair<int, int> make_pair() {
 TEST_CASE("ipc_channel: round-trip empty payload", "[ipc_channel]") {
     auto [a, b] = make_pair();
 
-    auto wres = kairos::ipc::write_message(a, kairos::ipc::msg_session_open);
+    auto wres = nomos::rt::ipc::write_message(a, nomos::rt::ipc::msg_session_open);
     REQUIRE(wres);
 
-    auto rres = kairos::ipc::read_message(b);
+    auto rres = nomos::rt::ipc::read_message(b);
     REQUIRE(rres);
-    REQUIRE(rres->type() == kairos::ipc::msg_session_open);
+    REQUIRE(rres->type() == nomos::rt::ipc::msg_session_open);
     REQUIRE(rres->payload.empty());
 
     ::close(a);
@@ -33,12 +33,12 @@ TEST_CASE("ipc_channel: round-trip string payload", "[ipc_channel]") {
     auto [a, b] = make_pair();
 
     const std::string payload = "{:id :org.cljseq/loop :name \"loop\"}";
-    auto wres = kairos::ipc::write_message(a, kairos::ipc::msg_register_source, payload);
+    auto wres = nomos::rt::ipc::write_message(a, nomos::rt::ipc::msg_register_source, payload);
     REQUIRE(wres);
 
-    auto rres = kairos::ipc::read_message(b);
+    auto rres = nomos::rt::ipc::read_message(b);
     REQUIRE(rres);
-    REQUIRE(rres->type() == kairos::ipc::msg_register_source);
+    REQUIRE(rres->type() == nomos::rt::ipc::msg_register_source);
 
     const std::string_view got{reinterpret_cast<const char*>(rres->payload.data()),
                                rres->payload.size()};
@@ -52,9 +52,9 @@ TEST_CASE("ipc_channel: EOF returns eof error", "[ipc_channel]") {
     auto [a, b] = make_pair();
     ::close(a); // close the write end
 
-    auto rres = kairos::ipc::read_message(b);
+    auto rres = nomos::rt::ipc::read_message(b);
     REQUIRE(!rres);
-    REQUIRE(rres.error() == kairos::ipc::channel_error::eof);
+    REQUIRE(rres.error() == nomos::rt::ipc::channel_error::eof);
 
     ::close(b);
 }

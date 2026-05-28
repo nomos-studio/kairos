@@ -8,6 +8,8 @@
 
 namespace kairos {
 
+using namespace nomos::rt;
+
 namespace {
 
     // Silence channel count ceiling: support up to 8 channels for any single port.

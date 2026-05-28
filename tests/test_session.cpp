@@ -1,26 +1,26 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 #include <catch2/catch_test_macros.hpp>
 
-#include <kairos/session.hpp>
+#include <nomos/rt/session.hpp>
 
 TEST_CASE("session: open in-memory database", "[session]") {
-    auto sess = kairos::session::open(":memory:");
+    auto sess = nomos::rt::session::open(":memory:");
     REQUIRE(sess.has_value());
     REQUIRE(sess->is_open());
 }
 
 TEST_CASE("session: close marks session as closed", "[session]") {
-    auto sess = kairos::session::open(":memory:");
+    auto sess = nomos::rt::session::open(":memory:");
     REQUIRE(sess->is_open());
     sess->close();
     REQUIRE(!sess->is_open());
 }
 
 TEST_CASE("session: register_source is idempotent", "[session]") {
-    auto sess = kairos::session::open(":memory:");
+    auto sess = nomos::rt::session::open(":memory:");
     REQUIRE(sess.has_value());
 
-    kairos::source_info src{
+    nomos::rt::source_info src{
         .id          = edn::keyword{"org.cljseq/loop"},
         .name        = "loop",
         .description = "cljseq loop sequencer",
@@ -31,7 +31,7 @@ TEST_CASE("session: register_source is idempotent", "[session]") {
 }
 
 TEST_CASE("session: emit writes an entry", "[session]") {
-    auto sess = kairos::session::open(":memory:");
+    auto sess = nomos::rt::session::open(":memory:");
     REQUIRE(sess.has_value());
 
     sess->register_source({

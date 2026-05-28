@@ -13,6 +13,8 @@
 
 namespace kairos {
 
+using namespace nomos::rt;
+
 namespace {
 
     std::vector<clap_audio_port_info_t> query_audio_ports(const clap_plugin_t* plugin,

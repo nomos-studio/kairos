@@ -21,7 +21,7 @@ control_thread::control_thread(config cfg, nomos::rt::param_queue& queue,
 void control_thread::dispatch_extension(int conn_fd, const nomos::rt::ipc::message& msg,
                                         std::optional<nomos::rt::session>& sess) {
     switch (msg.type()) {
-    case ipc::msg_graph_load: {
+    case nomos::rt::ipc::msg_graph_load: {
         if (msg.payload.empty())
             break;
         const std::string_view text{reinterpret_cast<const char*>(msg.payload.data()),
@@ -81,11 +81,11 @@ void control_thread::dispatch_extension(int conn_fd, const nomos::rt::ipc::messa
         break;
     }
 
-    case ipc::msg_graph_reset:
+    case nomos::rt::ipc::msg_graph_reset:
         graph_.store(std::make_unique<plugin_graph_manager>());
         break;
 
-    case ipc::msg_wasm_hot_swap: {
+    case nomos::rt::ipc::msg_wasm_hot_swap: {
         if (msg.payload.empty())
             break;
         const std::string_view text{reinterpret_cast<const char*>(msg.payload.data()),

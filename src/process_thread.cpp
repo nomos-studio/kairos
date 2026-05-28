@@ -8,6 +8,8 @@
 
 namespace kairos {
 
+using namespace nomos::rt;
+
 process_thread::process_thread(config cfg, rcu_managed<plugin_graph_manager>& graph,
                                link_peer& link, midi_event_queue& midi_out_queue,
                                input_event_queue& ipc_in_queue, input_event_queue& hw_midi_in_queue,

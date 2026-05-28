@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 #include <catch2/catch_test_macros.hpp>
 
-#include <kairos/spsc_queue.hpp>
+#include <nomos/rt/spsc_queue.hpp>
 
 #include <thread>
 #include <vector>
 
 TEST_CASE("spsc_queue: empty on construction", "[spsc_queue]") {
-    kairos::spsc_queue<int, 4> q;
+    nomos::rt::spsc_queue<int, 4> q;
     REQUIRE(q.empty());
     REQUIRE(q.size() == 0);
     REQUIRE(!q.pop().has_value());
 }
 
 TEST_CASE("spsc_queue: push and pop round-trip", "[spsc_queue]") {
-    kairos::spsc_queue<int, 4> q;
+    nomos::rt::spsc_queue<int, 4> q;
     REQUIRE(q.push(1));
     REQUIRE(q.push(2));
     REQUIRE(q.push(3));
@@ -30,8 +30,8 @@ TEST_CASE("spsc_queue: push and pop round-trip", "[spsc_queue]") {
 }
 
 TEST_CASE("spsc_queue: producer/consumer threads", "[spsc_queue]") {
-    kairos::spsc_queue<int, 64> q;
-    constexpr int               n = 1000;
+    nomos::rt::spsc_queue<int, 64> q;
+    constexpr int                  n = 1000;
 
     std::thread producer([&] {
         for (int i = 0; i < n; ++i) {

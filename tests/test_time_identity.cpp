@@ -2,19 +2,19 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include <kairos/time_identity.hpp>
+#include <nomos/rt/time_identity.hpp>
 
 TEST_CASE("time_identity: no pending at construction", "[time_identity]") {
-    kairos::time_identity ti;
+    nomos::rt::time_identity ti;
     REQUIRE(!ti.pending.has_value());
     REQUIRE(!ti.transition_ready(0.0));
     REQUIRE(!ti.apply_if_ready(0.0));
 }
 
 TEST_CASE("time_identity: pending fires at apply_at", "[time_identity]") {
-    kairos::time_identity ti;
+    nomos::rt::time_identity ti;
     ti.current = {120.0, 0.0};
-    ti.pending = kairos::pending_transition{
+    ti.pending = nomos::rt::pending_transition{
         .tl       = {140.0, 4.0},
         .policy   = edn::keyword{"bar-quantize"},
         .apply_at = 4.0,
@@ -32,9 +32,9 @@ TEST_CASE("time_identity: pending fires at apply_at", "[time_identity]") {
 }
 
 TEST_CASE("time_identity: apply_if_ready is idempotent after promotion", "[time_identity]") {
-    kairos::time_identity ti;
+    nomos::rt::time_identity ti;
     ti.current = {120.0, 0.0};
-    ti.pending = kairos::pending_transition{
+    ti.pending = nomos::rt::pending_transition{
         .tl       = {140.0, 4.0},
         .policy   = edn::keyword{"snap"},
         .apply_at = 4.0,
