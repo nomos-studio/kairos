@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 #include <kairos/plugin_instance.hpp>
+#include <kairos/clap_kairos_tap_bus.h>
 
 #include "builtin_plugins.hpp"
 #ifdef KAIROS_WASM_BRIDGE
@@ -30,6 +31,11 @@ namespace {
         return ports;
     }
 
+    const clap_plugin_tap_bus_t* query_tap_bus(const clap_plugin_t* plugin) {
+        return static_cast<const clap_plugin_tap_bus_t*>(
+            plugin->get_extension(plugin, CLAP_EXT_KAIROS_TAP_BUS));
+    }
+
     const clap_plugin_t* create_builtin(const clap_host_t* host, const std::string& plugin_id) {
 #ifdef KAIROS_WASM_BRIDGE
         if (plugin_id.starts_with(k_wasm_bridge_id_prefix)) {
@@ -54,12 +60,13 @@ result<plugin_instance, plugin_error> plugin_instance::load(const std::string& p
         if (!plugin->init(plugin))
             return unexpected<plugin_error>{plugin_error::plugin_init_failed};
         plugin_instance inst;
-        inst.lib_handle_ = nullptr;
-        inst.entry_      = nullptr;
-        inst.plugin_     = plugin;
-        inst.state_      = state::initialized;
-        inst.in_ports_   = query_audio_ports(plugin, true);
-        inst.out_ports_  = query_audio_ports(plugin, false);
+        inst.lib_handle_  = nullptr;
+        inst.entry_       = nullptr;
+        inst.plugin_      = plugin;
+        inst.state_       = state::initialized;
+        inst.tap_bus_ext_ = query_tap_bus(plugin);
+        inst.in_ports_    = query_audio_ports(plugin, true);
+        inst.out_ports_   = query_audio_ports(plugin, false);
         return inst;
     }
 
@@ -101,12 +108,13 @@ result<plugin_instance, plugin_error> plugin_instance::load(const std::string& p
     }
 
     plugin_instance inst;
-    inst.lib_handle_ = handle;
-    inst.entry_      = entry;
-    inst.plugin_     = plugin;
-    inst.state_      = state::initialized;
-    inst.in_ports_   = query_audio_ports(plugin, true);
-    inst.out_ports_  = query_audio_ports(plugin, false);
+    inst.lib_handle_  = handle;
+    inst.entry_       = entry;
+    inst.plugin_      = plugin;
+    inst.state_       = state::initialized;
+    inst.tap_bus_ext_ = query_tap_bus(plugin);
+    inst.in_ports_    = query_audio_ports(plugin, true);
+    inst.out_ports_   = query_audio_ports(plugin, false);
     return inst;
 }
 
@@ -117,18 +125,20 @@ plugin_instance::~plugin_instance() {
 plugin_instance::plugin_instance(plugin_instance&& o) noexcept
     : lib_handle_(std::exchange(o.lib_handle_, nullptr)), entry_(std::exchange(o.entry_, nullptr)),
       plugin_(std::exchange(o.plugin_, nullptr)), state_(o.state_),
+      tap_bus_ext_(std::exchange(o.tap_bus_ext_, nullptr)),
       in_ports_(std::move(o.in_ports_)), out_ports_(std::move(o.out_ports_)) {
 }
 
 plugin_instance& plugin_instance::operator=(plugin_instance&& o) noexcept {
     if (this != &o) {
         teardown();
-        lib_handle_ = std::exchange(o.lib_handle_, nullptr);
-        entry_      = std::exchange(o.entry_, nullptr);
-        plugin_     = std::exchange(o.plugin_, nullptr);
-        state_      = o.state_;
-        in_ports_   = std::move(o.in_ports_);
-        out_ports_  = std::move(o.out_ports_);
+        lib_handle_  = std::exchange(o.lib_handle_, nullptr);
+        entry_       = std::exchange(o.entry_, nullptr);
+        plugin_      = std::exchange(o.plugin_, nullptr);
+        state_       = o.state_;
+        tap_bus_ext_ = std::exchange(o.tap_bus_ext_, nullptr);
+        in_ports_    = std::move(o.in_ports_);
+        out_ports_   = std::move(o.out_ports_);
     }
     return *this;
 }
@@ -208,6 +218,21 @@ result<std::monostate, plugin_error> plugin_instance::hot_swap(const std::string
     (void)new_wasm_path;
     return unexpected<plugin_error>{plugin_error::hot_swap_unsupported};
 #endif
+}
+
+const clap_kairos_tap_schema_t* plugin_instance::tap_schema() const noexcept {
+    if (!tap_bus_ext_ || !plugin_)
+        return nullptr;
+    return tap_bus_ext_->get_schema(plugin_);
+}
+
+const float* plugin_instance::tap_frame(uint32_t* out_count) const noexcept {
+    if (!tap_bus_ext_ || !plugin_) {
+        if (out_count)
+            *out_count = 0;
+        return nullptr;
+    }
+    return tap_bus_ext_->get_tap_frame(plugin_, out_count);
 }
 
 const clap_plugin_descriptor_t* plugin_instance::descriptor() const noexcept {

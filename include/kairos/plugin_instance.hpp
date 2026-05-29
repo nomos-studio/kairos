@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 #pragma once
 
+#include <kairos/clap_kairos_tap_bus.h>
+
 #include <nomos/rt/result.hpp>
 
 #include <clap/entry.h>
@@ -72,6 +74,13 @@ class plugin_instance {
     // Only valid in activated or processing state.
     nomos::rt::result<std::monostate, plugin_error> hot_swap(const std::string& new_wasm_path);
 
+    // Tap-bus — kairos/tap-bus custom CLAP extension.
+    // Returns nullptr if the plugin does not expose the extension.
+    // tap_schema() is valid after activate() and until the next activate() or reset().
+    // tap_frame() is valid on the audio thread immediately after process().
+    const clap_kairos_tap_schema_t* tap_schema() const noexcept;
+    const float*                    tap_frame(uint32_t* out_count) const noexcept;
+
     const clap_plugin_descriptor_t* descriptor() const noexcept;
     state                           current_state() const noexcept;
 
@@ -87,6 +96,8 @@ class plugin_instance {
     const clap_plugin_entry_t* entry_{nullptr};
     const clap_plugin_t*       plugin_{nullptr};
     state                      state_{state::initialized};
+
+    const clap_plugin_tap_bus_t* tap_bus_ext_{nullptr};
 
     std::vector<clap_audio_port_info_t> in_ports_;
     std::vector<clap_audio_port_info_t> out_ports_;
