@@ -14,6 +14,8 @@ project(kairos
 # - FetchContent + pinned tag for any dependency with a build step.
 # - FETCHCONTENT_UPDATES_DISCONNECTED: skip network on subsequent invocations.
 # - Tests use Catch2 v3 (Boost Software License, header-friendly).
+# - nomos-topology: header-only schema constants; pin to a commit SHA.
+#   Set NOMOS_TOPOLOGY_SRC_DIR to a local checkout to skip the network fetch.
 # ---------------------------------------------------------------------------
 
 include(FetchContent)
@@ -43,6 +45,17 @@ FetchContent_Declare(clap
     GIT_TAG        1.2.6
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(clap)
+
+# nomos-topology — header-only EDN key constants (nomos::topology).
+#   To use a local checkout: cmake -DNOMOS_TOPOLOGY_SRC_DIR=/path/to/nomos-topology ...
+if(DEFINED NOMOS_TOPOLOGY_SRC_DIR)
+    FetchContent_Declare(nomos_topology SOURCE_DIR "${NOMOS_TOPOLOGY_SRC_DIR}")
+else()
+    FetchContent_Declare(nomos_topology
+        GIT_REPOSITORY https://github.com/nomos-studio/nomos-topology.git
+        GIT_TAG        01eef2f14e61e62a93ada455ca2a47263a90f3c5)
+endif()
+FetchContent_MakeAvailable(nomos_topology)
 
 # nomos-rt — shared C++ runtime substrate (Link, MIDI/OSC, IPC, txlog, modulators).
 #   To use a local checkout: cmake -DNOMOS_RT_DIR=/path/to/nomos-rt ...
@@ -149,6 +162,7 @@ target_include_directories(kairos-core
 target_link_libraries(kairos-core
     PUBLIC
         nomos::rt
+        nomos::topology
     PRIVATE
         nomos::rt-exe-headers
         ${CMAKE_DL_LIBS}
